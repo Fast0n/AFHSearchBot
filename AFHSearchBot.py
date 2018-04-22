@@ -83,45 +83,36 @@ def on_chat_message(msg):
             search[chat_id].replace(' ', '%20') + "&type=" + tipo[chat_id]
 
         r = requests.get(URL, allow_redirects=True)
-        open('__pycache__/' + str(chat_id) +
-             '.json ', 'wb').write(r.content)
 
-        with open('__pycache__/' + str(chat_id) + '.json ') as json_file:
-            try:
-                json_data = json.load(json_file)
-
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text='Scopri di più',
-                                          url=link)],
-                ])
-                bot.sendMessage(chat_id, "Ho cercando: \n`" +
-                                link + "`", parse_mode='Markdown', reply_markup=keyboard)
-
-                for key in json_data.keys():
-                    if command[chat_id] == '/find':
-                        nfile = int(command_input) - 1
-                    else:
-                        nfile = 4
-
-                    if (int(key) <= nfile):
-
-                        if (tipo[chat_id] == 'files'):
-                            textMessage = ("📦 [" + json_data[key]['name'] + "](" +
-                                           json_data[key]['url'] + ")\n\n⬇️ `(" + json_data[key]['ndownload'] + ")`" + "\nℹ️ *" + json_data[key]['size'] + "\n🗓️ " + json_data[key]['upload_date'] + "*")
-
-                        if (tipo[chat_id] == 'devices'):
-                            textMessage = ("📲 [" + json_data[key]['name'] + "](" +
-                                           json_data[key]['url'] + ")\n\n📱 `(" + json_data[key]['codename'] + ")`")
-
-                        if (tipo[chat_id] == 'developers'):
-                            textMessage = ("👤 [" + json_data[key]['name'] + "](" +
-                                           json_data[key]['url'] + ")")
-
-                        bot.sendMessage(chat_id, textMessage,
+        try:
+            json_data = json.loads(r.text)
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text='Scopri di più',
+                                    url=link)],
+            ])
+            bot.sendMessage(chat_id, "Ho cercando: \n`" +
+                            link + "`", parse_mode='Markdown', reply_markup=keyboard)
+            for key in json_data.keys():
+                if command[chat_id] == '/find':
+                    nfile = int(command_input) - 1
+                else:
+                    nfile = 4
+                if (int(key) <= nfile):
+                    if (tipo[chat_id] == 'files'):
+                        textMessage = ("📦 [" + json_data[key]['name'] + "](" +
+                                    json_data[key]['url'] + ")\n\n⬇️ `(" + json_data[key]['ndownload'] + ")`" + "\nℹ️ *" + json_data[key]['size'] + "\n🗓️ " + json_data[key]['upload_date'] + "*")
+                    if (tipo[chat_id] == 'devices'):
+                        textMessage = ("📲 [" + json_data[key]['name'] + "](" +
+                                    json_data[key]['url'] + ")\n\n📱 `(" + json_data[key]['codename'] + ")`")
+                    if (tipo[chat_id] == 'developers'):
+                        textMessage = ("👤 [" + json_data[key]['name'] + "](" +
+                                    json_data[key]['url'] + ")")
+                    bot.sendMessage(chat_id, textMessage,
                                         parse_mode='Markdown', reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
-            except:
-                bot.sendMessage(
-                    chat_id, "*Nessun file trovato. Prova command cercare qualcosa di più specifico*", parse_mode='Markdown', reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
+
+        except:
+            bot.sendMessage(
+                        chat_id, "*Nessun file trovato. Prova command cercare qualcosa di più specifico*", parse_mode='Markdown', reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
         user_state[chat_id] = 0
 
 
