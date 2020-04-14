@@ -1,5 +1,5 @@
 # Android File Host Search Bot
-<a href="https://paypal.me/fast0n" title="Donate"><img src="https://img.shields.io/badge/Dona-PayPal-009cde.svg?style=flat-square"></a>
+[![Donate](https://img.shields.io/badge/Donate-PayPal-blue?style=flat-square)](https://paypal.me/fast0n) [![License](https://img.shields.io/github/license/Fast0n/MediterraneabusBot)](https://github.com/Fast0n/AFHSearchBot/blob/master/LICENSE) 
 
 <img src='img/logo.png' alt='AFHSearchBot' height='150' /></a>
 
@@ -9,7 +9,7 @@ Semplice Bot Telegram per la ricerca di file/dispositivi/sviluppatori su Android
 
 ------------------------------------------------------------------------------------
 
-This bot is realized with [Telepot](https://github.com/nickoala/telepot) and [AFHSearch-api](https://github.com/fast0n/afhsearch-api).
+This bot is realized with [AFHSearch-api](https://github.com/fast0n/afhsearch-api).
 
 This is an unofficial bot developed to learn. Android File Host is not responsible in any way.
 

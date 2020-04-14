@@ -1,167 +1,177 @@
-#!/usr/bin/python3.6
-from bs4 import BeautifulSoup
-from settings import token, start_msg, client_file, keypad, typepad, type_
-from telepot.namedtuple import ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
-from time import sleep
-import os
+import logging
 import json
-import re
 import requests
-import sys
-import telepot
 
-# State for user
-user_state = {}
+import telegram.error as tg_error
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (ParseMode, MessageEntity, ChatAction,
+                      ReplyKeyboardMarkup, ReplyKeyboardRemove)
+from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
+                          MessageHandler, Updater, ConversationHandler)
 
-command = {}
-search = {}
-tipo = {}
-markup = ReplyKeyboardMarkup(keyboard=keypad)
-markup1 = ReplyKeyboardMarkup(keyboard=typepad)
+from settings import token, start_msg, typepad, type_, url_api
 
 
-def on_chat_message(msg):
-    content_type, chat_type, chat_id = telepot.glance(msg)
-    command_input = msg['text']
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-    # Check user state
-    try:
-        user_state[chat_id] = user_state[chat_id]
-    except:
-        user_state[chat_id] = 0
-
-    # start command
-    if command_input == "/start":
-        if register_user(chat_id):
-            bot.sendMessage(chat_id, start_msg, parse_mode='Markdown')
-            command_input = "/find"
-
-    elif command_input == '/dona':
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(
-                text="Dona", url='https://paypal.me/Fast0n/')],
-        ])
-        bot.sendMessage(chat_id, "Codice sorgente: \n" +
-                        "[AFHSearchBot](https://github.com/Fast0n/AFHSearchBot)\n\n" +
-                        "Sviluppato da: \n" +
-                        "[Fast0n](https://github.com/Fast0n)\n\n" +
-                        "🍺 Se sei soddisfatto offrimi una birra 🍺", parse_mode='Markdown', reply_markup=keyboard)
-        user_state[chat_id] = 0
-
-    elif command_input == '/find' or command_input == '/direct':
-        command[chat_id] = command_input
-        bot.sendMessage(chat_id, "Cosa stai cercando?", reply_markup=markup1)
-        user_state[chat_id] = 1
-
-    elif user_state[chat_id] == 1:
-        tipo[chat_id] = command_input
-        bot.sendMessage(chat_id, "Nome " + type_[command_input],
-                        reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
-        user_state[chat_id] = 2
-
-    elif user_state[chat_id] == 2 and command[chat_id] == '/find':
-        search[chat_id] = command_input
-        bot.sendMessage(
-            chat_id, "Quanti file vuoi visualizzare? (Solo numeri)", reply_markup=markup)
-        user_state[chat_id] = 3
-
-    elif user_state[chat_id] == 3 or command[chat_id] == '/direct':
-        if command[chat_id] == '/direct':
-            search[chat_id] = command_input
-        else:
-            try:
-                if int(command_input) > 15 or int(command_input) == 0:
-                    print(command_input)
-            except ValueError:
-                bot.sendMessage(
-                    chat_id, "Quanti file vuoi visualizzare? (Solo numeri)", reply_markup=markup)
-                return
-
-        link = "https://www.androidfilehost.com/?w=search&s=" + search[chat_id].lower().replace(" ", "-") + \
-            "&type=" + tipo[chat_id]
-        URL = "https://afhsearch-api.herokuapp.com/" + "?search= " + \
-            search[chat_id].replace(' ', '%20') + "&type=" + tipo[chat_id]
-
-        r = requests.get(URL, allow_redirects=True)
-
-        try:
-            json_data = json.loads(r.text)
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text='Scopri di più',
-                                    url=link)],
-            ])
-            bot.sendMessage(chat_id, "Ho cercando: \n`" +
-                            link + "`", parse_mode='Markdown', reply_markup=keyboard)
-            for key in json_data.keys():
-                if command[chat_id] == '/find':
-                    nfile = int(command_input) - 1
-                else:
-                    nfile = 4
-                if (int(key) <= nfile):
-                    if (tipo[chat_id] == 'files'):
-                        textMessage = ("📦 [" + json_data[key]['name'] + "](" +
-                                    json_data[key]['url'] + ")\n\n⬇️ `(" + json_data[key]['ndownload'] + ")`" + "\nℹ️ *" + json_data[key]['size'] + "\n🗓️ " + json_data[key]['upload_date'] + "*")
-                    if (tipo[chat_id] == 'devices'):
-                        textMessage = ("📲 [" + json_data[key]['name'] + "](" +
-                                    json_data[key]['url'] + ")\n\n📱 `(" + json_data[key]['codename'] + ")`")
-                    if (tipo[chat_id] == 'developers'):
-                        textMessage = ("👤 [" + json_data[key]['name'] + "](" +
-                                    json_data[key]['url'] + ")")
-                    bot.sendMessage(chat_id, textMessage,
-                                        parse_mode='Markdown', reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
-
-        except:
-            bot.sendMessage(
-                        chat_id, "*Nessun file trovato. Prova command cercare qualcosa di più specifico*", parse_mode='Markdown', reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
-        user_state[chat_id] = 0
+NAME, ELEMENTSEARCH, RESULT = range(3)
 
 
-def register_user(chat_id):
-    """
-    Register given user to receive news
-    """
-    insert = 1
+def markup_key():
+
+    arr = []
+    for i in (range(0, len(list(range(1, 16))))):
+        arr.append(str(list(range(1, 16))[i]))
+
+    arrs = []
+    while len(arr) > 4:
+        pice = arr[:4]
+        arrs.append(pice)
+        arr = arr[4:]
+    arrs.append(arr)
+
+    return arrs
+
+
+reply_keyboard = markup_key()
+
+
+def start(update, context):
+    """Send starting message"""
+    update.message.reply_text(start_msg,  parse_mode=ParseMode.MARKDOWN)
+
+
+def find(update, context):
+    context.user_data['search_type'] = update.message.text
+    update.message.reply_text("Cosa stai cercando?",  parse_mode=ParseMode.MARKDOWN,
+                              reply_markup=ReplyKeyboardMarkup(typepad, one_time_keyboard=True, resize_keyboard=True))
+
+    return NAME
+
+
+def name(update, context):
+    context.user_data['type'] = update.message.text
+    update.message.reply_text(
+        "Nome " + type_[update.message.text], reply_markup=ReplyKeyboardRemove())
+
+    if context.user_data['search_type'] == "/find":
+        update.message.reply_text("Quanti file vuoi visualizzare? (Solo numeri)",  parse_mode=ParseMode.MARKDOWN,
+                                  reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True))
+        return ELEMENTSEARCH
+
+    elif context.user_data['search_type'] == "/direct":
+        context.user_data['elementseach'] = update.message.text
+        return RESULT
+
+
+def elementsearch(update, context):
+    context.user_data['elementseach'] = update.message.text
+
+    return RESULT
+
+
+def result(update, context):
+
+    link = "https://www.androidfilehost.com/?w=search&s=" + context.user_data['elementseach'].lower().replace(" ", "-") + \
+        "&type=" + context.user_data['type']
+    URL = url_api + "?search=" + \
+        context.user_data['elementseach'].replace(
+            ' ', '%20') + "&type=" + context.user_data['type']
+
+    r = requests.get(URL, allow_redirects=True)
 
     try:
-        f = open(client_file, "r+")
+        json_data = json.loads(r.text)
+        update.message.reply_text("Ho cercando: \n`" +
+                                  link + "`", parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(
+                                      [[InlineKeyboardButton(text="Scopri di più",
+                                                             url=link)]]))
 
-        for user in f.readlines():
-            if user.replace('\n', '') == str(chat_id):
-                insert = 0
+        for key in json_data.keys():
+            if context.user_data['search_type'] == '/find':
+                nfile = int(update.message.text) - 1
+            else:
+                nfile = 4
+            if (int(key) <= nfile):
+                if (context.user_data['type'] == 'files'):
+                    textMessage = ("📦 [" + json_data[key]['name'] + "](" +
+                                   json_data[key]['url'] + ")\n\n⬇️ `(" + json_data[key]['ndownload'] + ")`" + "\nℹ️ *" + json_data[key]['size'] + "\n🗓️ " + json_data[key]['upload_date'] + "*")
+                if (context.user_data['type'] == 'devices'):
+                    textMessage = ("📲 [" + json_data[key]['name'] + "](" +
+                                   json_data[key]['url'] + ")\n\n📱 `(" + json_data[key]['codename'] + ")`")
+                if (context.user_data['type'] == 'developers'):
+                    textMessage = ("👤 [" + json_data[key]['name'] + "](" +
+                                   json_data[key]['url'] + ")")
+                update.message.reply_text(textMessage,
+                                          parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
 
-    except IOError:
-        f = open(client_file, "w")
-
-    if insert:
-        f.write(str(chat_id) + '\n')
-
-    f.close()
-
-    return insert
+    except Exception as e:
+        print(e)
+        update.message.reply_text("*Nessun file trovato. Prova command cercare qualcosa di più specifico*",
+                                  parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
+    return ConversationHandler.END
 
 
-# Main
-print("Avvio AFHSearchBot")
+def dona(update, context):
+    update.message.reply_text("Codice sorgente: \n" +
+                              "[AFHSearchBot](https://github.com/Fast0n/AFHSearchBot)\n\n" +
+                              "Sviluppato da: \n" +
+                              "[Fast0n](https://github.com/Fast0n)\n\n" +
+                              "🍺 Se sei soddisfatto offrimi una birra 🍺", parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(
+                                  [[InlineKeyboardButton(text="Dona",
+                                                         url="https://paypal.me/Fast0n/")]]))
+    return ConversationHandler.END
 
-# PID file
-pid = str(os.getpid())
-pidfile = "/tmp/AFHSearchBot.pid"
 
-# Check if PID exist
-if os.path.isfile(pidfile):
-    print("%s already exists, exiting!" % pidfile)
-    sys.exit()
+def error(update, context):
+    """Log errors caused by updates"""
+    logger.warning('Update "%s" caused error "%s"', update, context.error)
 
-# Create PID file
-f = open(pidfile, 'w')
-f.write(pid)
 
-# Start working
-try:
-    bot = telepot.Bot(token)
-    bot.message_loop(on_chat_message)
-    while 1:
-        sleep(10)
+def main():
+    """Starts the bot"""
+    print("Avvio AFHSearchBot")
 
-finally:
-    os.unlink(pidfile)
+    # Create the Updater
+    updater = Updater(token, use_context=True)
+
+    # Get the dispatcher to register handlers
+    dp = updater.dispatcher
+
+    # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
+    conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(Filters.text & (~Filters.regex(
+            '^(/start)$') & (~Filters.regex('^(/dona)$')) & (~Filters.regex('^(/direct)$') & (~Filters.regex('^(/find)$')))), find)],
+
+        states={
+
+            NAME: [MessageHandler(Filters.text & (~Filters.regex('^(/start)$') & (~Filters.regex('^(/dona)$'))), name)],
+            ELEMENTSEARCH: [MessageHandler(Filters.text & (~Filters.regex('^(/start)$') & (~Filters.regex('^(/dona)$'))), elementsearch)],
+            RESULT: [MessageHandler(Filters.text & (~Filters.regex('^(/start)$') & (~Filters.regex('^(/dona)$'))), result)],
+
+        },
+
+        fallbacks=[MessageHandler(Filters.text & (
+            Filters.regex('^(Stop)$')), start)]
+
+    )
+
+    # Register handlers
+    dp.add_handler(conv_handler)
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("find", find))
+    dp.add_handler(CommandHandler("direct", find))
+    dp.add_handler(CommandHandler("dona", dona))
+
+    # Register error handler
+    dp.add_error_handler(error)
+
+    # Start the Bot
+    updater.start_polling()
+    updater.idle()
+
+
+if __name__ == '__main__':
+    main()

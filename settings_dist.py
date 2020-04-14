@@ -8,16 +8,8 @@ start_msg = "Benvenuto su @AFHSearchBot\n"\
             "⚠️Attenzione⚠️\n"\
             "Il bot è stato creato in modo non ufficiale."
 
-# File with 'started' clients
-client_file = "clients_id.txt"
-
-# keypad
-keypad = [
-    ["1", "2", "3", "4"],
-    ["5", "6", "7", "8"],
-    ["9", "10", "11", "12"],
-    ["13", "14", "15"]
-]
+# Url for api
+url_api = 'URL'
 
 # typepad
 typepad = [
